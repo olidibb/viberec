@@ -2,7 +2,6 @@
 from bs4 import BeautifulSoup
 from lingua import Language, LanguageDetectorBuilder
 import requests
-from string import Template
 from urllib.parse import urljoin
 
 languages = [Language.ENGLISH, Language.FRENCH, Language.SPANISH, Language.ITALIAN, Language.GERMAN, Language.DUTCH, Language.PORTUGUESE, Language.FINNISH, Language.DANISH, Language.SWEDISH]
@@ -99,7 +98,7 @@ class ListScraper:
         pass
 
 
-lscraper = ListScraper('jabzie_crockett', 'friday-funday')
+lscraper = ListScraper('jbutts15', 'the-complete-criterion-collection')
 lscraper.get_film_names()
 print(1)
 class FilmScraper:
