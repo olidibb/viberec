@@ -1,6 +1,8 @@
 import sqlite3
 
-connection = sqlite3.connect('../../data/raw/film_database.db')
+DB_LOCATION = '../../data/raw/film_database.db'
+
+connection = sqlite3.connect(DB_LOCATION)
 cursor = connection.cursor()
 
 cursor.execute("""
@@ -18,6 +20,8 @@ cursor.execute("""
     CREATE TABLE IF NOT EXISTS reviews (
         id INTEGER PRIMARY KEY,
         film_id INTEGER,
+        user TEXT,
+        rating FLOAT,
         review_text TEXT,
         FOREIGN KEY (film_id) REFERENCES films (id)
         )

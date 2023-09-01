@@ -1,28 +1,33 @@
-
-from bs4 import BeautifulSoup
-from lingua import Language, LanguageDetectorBuilder
-import requests
+from functools import partial
 from urllib.parse import urljoin
 
-languages = [Language.ENGLISH, Language.FRENCH, Language.SPANISH, Language.ITALIAN, Language.GERMAN, Language.DUTCH, Language.PORTUGUESE, Language.FINNISH, Language.DANISH, Language.SWEDISH]
+import requests
+from bs4 import BeautifulSoup
+from lingua import Language, LanguageDetectorBuilder
+
+languages = [Language.ENGLISH, Language.FRENCH, Language.SPANISH, Language.ITALIAN, Language.GERMAN, Language.DUTCH,
+             Language.PORTUGUESE, Language.FINNISH, Language.DANISH, Language.SWEDISH]
 detector = LanguageDetectorBuilder.from_languages(*languages).build()
 
 
 def check_text_in_english(text):
-
     english_detection_confidence = detector.detect_language_of(text)
     return english_detection_confidence == Language.ENGLISH
 
+
 def get_stars_from_rating_string(rating_string):
     return int(''.join([char for char in rating_string if char.isdigit()])) / 2
+
 
 def get_page_url_comp(base_url, base_page_url, page_no):
     if page_no == 1:
         page_url_comp = base_url
     else:
 
-        page_url_comp = urljoin(base_url, base_page_url.format(page=str(page_no)))
+        page_url_suffix = base_page_url.format(page=str(page_no))
+        page_url_comp = urljoin(base_url, page_url_suffix)
     return page_url_comp
+
 
 class FilmData:
     def __init__(self, film, url_film_title, year, directors, genres, themes):
@@ -32,6 +37,8 @@ class FilmData:
         self.directors = directors
         self.genres = genres
         self.themes = themes
+
+
 class FilmReview:
     def __init__(self, film, url_film_title, user, rating, review_text):
         self.film = film
@@ -46,6 +53,7 @@ class FilmReview:
     def __repr__(self):
         return f'Film: {self.film} \n User: {self.user} \n Rating: {self.rating} \n Review text: {self.review_text}'
 
+
 BASE_REV_URL = 'reviews/by/added'
 BASE_LB_URL = 'https://letterboxd.com'
 CREW_URL_SUFFIX = 'crew'
@@ -53,12 +61,22 @@ GENRES_URL_SUFFIX = 'genres'
 SHOW_ALL_THEMES_TEXT = 'Show All…'
 
 base_page_url = 'page/{page}'
-base_film_url = 'https://letterboxd.com/film/{film}'
-base_list_url = '{user}/list/{list_name}'
+base_film_url = partial('{lb_url}/film/{film}'.format, lb_url=BASE_LB_URL)
+base_list_url = '{user}/list/{list_name}/'
+
+
 def fetch_html(url):
+    page = requests.get(url)
+    if page.status_code != 200:
+        raise ValueError(f'URL {url} returned status code {page.status_code}')
+
     return requests.get(url)
+
+
 def get_page_content(page):
     return BeautifulSoup(page.content, 'html.parser')
+
+
 class ListScraper:
     def __init__(self, user, list_name):
         self.user = user
@@ -82,25 +100,32 @@ class ListScraper:
                 pages_empty = True
                 break
 
-            if page_posters and page.status_code == 200:
+            if page_posters:
                 for poster_element in page_posters:
                     url_film_title = poster_element['data-film-slug']
                     self.url_film_titles.append(url_film_title)
                 page_no += 1
             else:
                 pages_empty = True
+
     def scrape_film_metadata(self):
         for url_film_title in self.url_film_titles:
             metadata_scraper = FilmDataScraper(url_film_title)
             metadata_scraper.scrape_metadata()
             metadata_scraper.scrape_genres()
+
     def scrape_film_reviews(self):
+        for url_film_title in self.url_film_titles:
+            review_scraper = FilmReviewScraper(url_film_title)
+            review_scraper.scrape_reviews()
         pass
 
 
 lscraper = ListScraper('jbutts15', 'the-complete-criterion-collection')
 lscraper.get_film_names()
 print(1)
+
+
 class FilmScraper:
     def __init__(self, url_film_title):
         self.url_film_title = url_film_title
@@ -108,6 +133,7 @@ class FilmScraper:
 
     def get_tab_url(self, url_suffix):
         return urljoin(self.base_film_url, url_suffix)
+
 
 class FilmDataScraper(FilmScraper):
 
@@ -145,7 +171,8 @@ class FilmDataScraper(FilmScraper):
         genres = [genre.text for genre in genres_results.find_all('a', class_='text-slug')]
         themes_results = genres_results.find_next_sibling('div', class_='text-sluglist')
         try:
-            themes = [theme.text for theme in themes_results.find_all('a', class_='text-slug') if theme.text != SHOW_ALL_THEMES_TEXT]
+            themes = [theme.text for theme in themes_results.find_all('a', class_='text-slug') if
+                      theme.text != SHOW_ALL_THEMES_TEXT]
             self.themes = themes
         except AttributeError:
             self.themes = None
@@ -153,11 +180,11 @@ class FilmDataScraper(FilmScraper):
         self.genres = genres
 
 
-
 class FilmReviewScraper(FilmScraper):
     def __init__(self, url_film_title):
         super().__init__(url_film_title)
         self.review_list = []
+
     def scrape_reviews(self, page_limit=None):
 
         page_no = 1
@@ -178,8 +205,8 @@ class FilmReviewScraper(FilmScraper):
                     rating_element = attribution.find('span', class_='rating')
                     try:
                         star_rating = \
-                        [get_stars_from_rating_string(class_) for class_ in rating_element.attrs['class'] if
-                         any(str.isdigit(char) for char in class_)][0]
+                            [get_stars_from_rating_string(class_) for class_ in rating_element.attrs['class'] if
+                             any(str.isdigit(char) for char in class_)][0]
                     except AttributeError:
                         star_rating = None
                     review_text = review_element.find('div', class_='body-text').text
@@ -188,6 +215,7 @@ class FilmReviewScraper(FilmScraper):
                 page_no += 1
             else:
                 pages_empty = True
+
 
 film = 'green-snake'
 fds = FilmDataScraper(film)
